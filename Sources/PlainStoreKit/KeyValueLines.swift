@@ -1,9 +1,8 @@
 import Foundation
 
-/// Minimal parser for "key: value" lines.
 public enum KeyValueLines {
-    public static func parse(_ raw: String) -> [String: String] {
-        var out: [String: String] = [:]
+    public static func parse(_ raw: String) -> [String:String] {
+        var out: [String:String] = [:]
         raw.split(whereSeparator: \.isNewline).forEach { line in
             let s = line.trimmingCharacters(in: .whitespaces)
             guard !s.isEmpty, !s.hasPrefix("#"),
