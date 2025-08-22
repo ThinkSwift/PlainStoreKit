@@ -1,6 +1,6 @@
 import Foundation
 
-// Replaces $(loc:key|Fallback) with localized string.
+/// Replaces $(loc:key|Fallback) with a localized string.
 enum Localize {
     static func apply(_ text: String, bundle: Bundle) -> String {
         let pattern = #"\$\(\s*loc\s*:\s*([A-Za-z0-9_.-]+)(?:\s*\|\s*([^)]+))?\s*\)"#
