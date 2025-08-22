@@ -1,8 +1,6 @@
 import SwiftData
 import Foundation
 
-public enum IngestMode { case replace, merge }
-
 @MainActor
 public final class RecordStore {
     public let container: ModelContainer
@@ -17,62 +15,34 @@ public final class RecordStore {
         }
     }
 
+    /// Replace the entire record with given text (no merge, no delete token).
     @discardableResult
     public func ingest(folder: String,
                        filename: String,
                        text: String,
-                       mode: IngestMode = .replace,
                        bundle: Bundle = .main) throws -> Record {
         let path = folder.isEmpty ? filename : "\(folder)/\(filename)"
         let localized = Localize.apply(text, bundle: bundle)
-
-        var rawToStore = localized
-        if mode == .merge, let existing = try fetch(path: path) {
-            let base = KeyValueLines.parse(existing.raw)
-            let diff = KeyValueLines.parse(localized)
-            var merged = base
-            for (k, v) in diff {
-                if v == "(del)" { merged.removeValue(forKey: k) }
-                else { merged[k] = v }
-            }
-            rawToStore = KeyValueLines.join(merged)
-        }
-
-        let kv = KeyValueLines.parse(rawToStore)
+        let kv = KeyValueLines.parse(localized)
         let json = Formats.infer(map: kv)
-        let ord = kv["order"].flatMap { Int($0) }
 
-        return try upsert(folder: folder,
-                          filename: filename,
-                          raw: rawToStore,
-                          json: json,
-                          orderOverride: ord)
+        let rec = try fetch(path: path) ?? Record(
+            folder: folder, filename: filename, format: "auto", raw: localized, date: .now, order: 0
+        )
+        rec.raw = localized
+        rec.format = "auto"
+        if let ord = kv["order"].flatMap(Int.init) { rec.order = ord }
+        rec.updatedAt = .now
+        rec.json = json
+
+        context.insert(rec)
+        try context.save()
+        return rec
     }
 
     public func render(path: String) throws -> String? {
         guard let r = try fetch(path: path), let d = r.json else { return nil }
         return d.prettyPrintedString
-    }
-
-    // MARK: - Internals
-
-    @discardableResult
-    private func upsert(folder: String,
-                        filename: String,
-                        raw: String,
-                        json: Data,
-                        orderOverride: Int?) throws -> Record {
-        let path = folder.isEmpty ? filename : "\(folder)/\(filename)"
-        let rec = try fetch(path: path) ?? Record(folder: folder, filename: filename, format: "auto", raw: raw, date: .now, order: 0)
-        rec.raw = raw
-        rec.format = "auto"
-        rec.date = rec.date            // keep logical date unless you want to change policy
-        if let o = orderOverride { rec.order = o }
-        rec.updatedAt = .now
-        rec.json = json
-        context.insert(rec)
-        try context.save()
-        return rec
     }
 
     public func fetch(folder: String? = nil) throws -> [Record] {
