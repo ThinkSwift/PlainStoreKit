@@ -13,4 +13,8 @@ public enum KeyValueLines {
         }
         return out
     }
+
+    public static func join(_ map: [String:String]) -> String {
+        map.keys.sorted().map { "\($0): \(map[$0] ?? "")" }.joined(separator: "\n")
+    }
 }
