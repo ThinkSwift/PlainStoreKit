@@ -7,10 +7,14 @@ public final class RecordStore {
     public var context: ModelContext { container.mainContext }
 
     public init(inMemory: Bool = false) {
-        let cfg = ModelConfiguration("PlainStore",
-                                     for: Record.self,
-                                     isStoredInMemoryOnly: inMemory)
-        self.container = try! ModelContainer(for: Record.self, configurations: cfg)
+        if inMemory {
+            // In-memory configuration
+            let cfg = ModelConfiguration(isStoredInMemoryOnly: true)
+            self.container = try! ModelContainer(for: Record.self, configurations: cfg)
+        } else {
+            // Default on-disk container
+            self.container = try! ModelContainer(for: Record.self)
+        }
     }
 
     @discardableResult
@@ -40,19 +44,21 @@ public final class RecordStore {
 
     public func fetch(folder: String? = nil) throws -> [Record] {
         var predicate: Predicate<Record> = #Predicate { _ in true }
-        if let f = folder { predicate = #Predicate { $0.folder == f } }
-        let sort = [
-            SortDescriptor(\.date, order: .reverse),
-            SortDescriptor(\.order),
-            SortDescriptor(\.filename)
+        if let f = folder {
+            predicate = #Predicate { $0.folder == f }
+        }
+        let sort: [SortDescriptor<Record>] = [
+            SortDescriptor<Record>(\.date, order: .reverse),
+            SortDescriptor<Record>(\.order),
+            SortDescriptor<Record>(\.filename)
         ]
-        return try context.fetch(FetchDescriptor<Record>(predicate: predicate, sortBy: sort))
+        let descriptor = FetchDescriptor<Record>(predicate: predicate, sortBy: sort)
+        return try context.fetch(descriptor)
     }
 
     public func fetch(path: String) throws -> Record? {
-        try context.fetch(FetchDescriptor<Record>(
-            predicate: #Predicate { $0.path == path },
-            fetchLimit: 1
-        )).first
+        var descriptor = FetchDescriptor<Record>(predicate: #Predicate { $0.path == path })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 }
