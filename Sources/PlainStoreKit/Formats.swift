@@ -1,47 +1,52 @@
 import Foundation
 
-/// Format registry and built-in KV parsers.
 public enum Formats {
+    // Optional custom parsers remain available.
     private static var map: [String: (String) -> Data?] = [:]
 
-    public static func register(_ name: String, _ parser: @escaping (String) -> Data?) {
-        map[name] = parser
-    }
+    public static func register(_ name: String, _ parser: @escaping (String) -> Data?) { map[name] = parser }
+    public static func parse(format: String, raw: String) -> Data? { map[format]?(raw) }
 
-    public static func parse(format: String, raw: String) -> Data? {
-        map[format]?(raw)
-    }
-
-    /// Plain key:value → JSON (all strings).
-    public static func parseKV(raw: String) -> Data {
-        let kv = KeyValueLines.parse(raw)
-        return (try? JSONSerialization.data(withJSONObject: kv)) ?? Data()
-    }
-
-    /// Typed key:value → JSON (types: "string|int|double|bool|point2").
-    public static func parseTyped(raw: String, types: [String:String]) -> Data {
-        let kv = KeyValueLines.parse(raw)
+    public static func infer(map: [String:String]) -> Data {
         var out: [String:Any] = [:]
-        for (k, v) in kv {
-            let t = types[k] ?? "string"
-            if let any = cast(v, t) { out[k] = any }
+        for (k, v) in map {
+            out[k] = cast(v)
         }
         return (try? JSONSerialization.data(withJSONObject: out)) ?? Data()
     }
 
-    private static func cast(_ v: String, _ type: String) -> Any? {
-        switch type {
-        case "string": return v
-        case "int":    return Int(v)
-        case "double": return Double(v)
-        case "bool":   return ["1","true","yes","on"].contains(v.lowercased())
-        case "point2":
-            let s = v.replacingOccurrences(of: ",", with: " ")
-            let a = s.split(separator: " ")
-            let x = Double(a.first ?? "0") ?? 0
-            let y = Double(a.dropFirst().first ?? "0") ?? 0
-            return ["x": x, "y": y]
-        default:       return v
+    // Heuristics: bool → int → double → point2 → ISO8601/yyyy-MM-dd → string
+    private static func cast(_ s: String) -> Any {
+        let lower = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if ["true","false","yes","no","on","off","1","0"].contains(lower) {
+            return ["true","yes","on","1"].contains(lower)
         }
+        if let i = Int(s), String(i) == s || s.trimmingCharacters(in: .whitespaces) == String(i) { return i }
+        if let d = Double(s), s.contains(".") || s.contains("e") || s.contains("E") { return d }
+
+        // point2: "x, y" or "x y"
+        let p = s.replacingOccurrences(of: ",", with: " ").split(separator: " ").map { String($0) }
+        if p.count == 2, let x = Double(p[0]), let y = Double(p[1]) {
+            return ["x": x, "y": y]
+        }
+
+        // date: ISO8601 or yyyy-MM-dd → standard ISO string
+        if let iso = ISO8601DateFormatter().date(from: s) {
+            return ISO8601DateFormatter().string(from: iso)
+        } else {
+            let df = DateFormatter()
+            df.locale = .init(identifier: "en_US_POSIX")
+            df.dateFormat = "yyyy-MM-dd"
+            if let d = df.date(from: s) {
+                return ISO8601DateFormatter().string(from: d)
+            }
+        }
+        return s
+    }
+
+    // Fallback: plain KV to JSON (all strings)
+    public static func parseKV(raw: String) -> Data {
+        let kv = KeyValueLines.parse(raw)
+        return (try? JSONSerialization.data(withJSONObject: kv)) ?? Data()
     }
 }
