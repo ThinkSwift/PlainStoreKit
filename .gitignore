@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved   # Library 패키지는 보통 커밋하지 않음
+
+# Xcode (패키지를 Xcode로 열 때 생기는 로컬 메타)
+DerivedData/
+xcuserdata/
+*.xcuserstate
