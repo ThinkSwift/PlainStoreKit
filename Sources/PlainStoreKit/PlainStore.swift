@@ -29,32 +29,6 @@ public final class PlainStore {
         }
     }
 
-   import SwiftData
-import Foundation
-
-public enum PlainStoreError: Error { case notFound(String) }
-
-@MainActor
-public final class PlainStore {
-    public let container: ModelContainer
-    public var context: ModelContext { container.mainContext }
-
-    // Robust init: falls back to in-memory during schema changes in development.
-    public init(inMemory: Bool = false) {
-        do {
-            if inMemory {
-                let cfg = ModelConfiguration(isStoredInMemoryOnly: true)
-                container = try ModelContainer(for: Record.self, configurations: cfg)
-            } else {
-                container = try ModelContainer(for: Record.self)
-            }
-        } catch {
-            let cfg = ModelConfiguration(isStoredInMemoryOnly: true)
-            container = try! ModelContainer(for: Record.self, configurations: cfg)
-            assertionFailure("ModelContainer init failed; using in-memory fallback: \(error)")
-        }
-    }
-
     // Save or update by "display name" derived from text (no filename input).
     @discardableResult
     public func save(folder: String, text: String) throws -> FileRecord {
