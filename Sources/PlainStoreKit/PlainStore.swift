@@ -8,12 +8,24 @@ public final class PlainStore {
     public let container: ModelContainer
     public var context: ModelContext { container.mainContext }
 
-    public init(inMemory: Bool = false) {
-        if inMemory {
+    // Explicit public no-arg initializer
+    public convenience init() {
+        self.init(inMemory: false)
+    }
+
+    // Designated initializer
+    public init(inMemory: Bool) {
+        do {
+            if inMemory {
+                let cfg = ModelConfiguration(isStoredInMemoryOnly: true)
+                container = try ModelContainer(for: Record.self, configurations: cfg)
+            } else {
+                container = try ModelContainer(for: Record.self)
+            }
+        } catch {
             let cfg = ModelConfiguration(isStoredInMemoryOnly: true)
-            self.container = try! ModelContainer(for: Record.self, configurations: cfg)
-        } else {
-            self.container = try! ModelContainer(for: Record.self)
+            container = try! ModelContainer(for: Record.self, configurations: cfg)
+            assertionFailure("ModelContainer init failed; fallback to in-memory: \(error)")
         }
     }
 
