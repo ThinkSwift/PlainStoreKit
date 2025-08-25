@@ -8,12 +8,8 @@ public final class PlainStore {
     public let container: ModelContainer
     public var context: ModelContext { container.mainContext }
 
-    // Explicit public no-arg initializer
-    public convenience init() {
-        self.init(inMemory: false)
-    }
+    public convenience init() { self.init(inMemory: false) }
 
-    // Designated initializer
     public init(inMemory: Bool) {
         do {
             if inMemory {
@@ -25,18 +21,18 @@ public final class PlainStore {
         } catch {
             let cfg = ModelConfiguration(isStoredInMemoryOnly: true)
             container = try! ModelContainer(for: Record.self, configurations: cfg)
-            assertionFailure("ModelContainer init failed; fallback to in-memory: \(error)")
+            assertionFailure("ModelContainer failed; fallback to in-memory: \(error)")
         }
     }
 
-    // Save or update by "display name" derived from text (no filename input).
+    // Save or update by display name derived from text
     @discardableResult
     public func save(folder: String, text: String) throws -> FileRecord {
         let name = baseName(from: text)
         return try save(folder: folder, name: name, text: text)
     }
 
-    // Save or update by explicit display name within a folder.
+    // Save or update by explicit display name
     @discardableResult
     public func save(folder: String, name: String, text: String) throws -> FileRecord {
         let kv = KeyValueLines.parse(text)
@@ -61,7 +57,7 @@ public final class PlainStore {
         }
     }
 
-    // Load by explicit display name.
+    // Load by explicit display name
     public func load(folder: String, name: String) throws -> FileRecord {
         guard let rec = try fetchByName(folder: folder, name: name) else {
             throw PlainStoreError.notFound("\(folder)/\(name)")
@@ -69,33 +65,32 @@ public final class PlainStore {
         return FileRecord(from: rec)
     }
 
-    // Load by name derived from the given text (handy in simple UIs).
+    // Load by name derived from text
     public func loadByDerivedName(folder: String, text: String) throws -> FileRecord {
         try load(folder: folder, name: baseName(from: text))
     }
 
-    // Load or create with default text if missing (explicit name).
+    // Load or create default if missing (explicit name)
     @discardableResult
     public func loadOrSaveDefault(folder: String,
                                   name: String,
                                   defaultText: @autoclosure () -> String) throws -> FileRecord {
-        if let rec = try fetchByName(folder: folder, name: name) {
-            return FileRecord(from: rec)
-        }
+        if let rec = try fetchByName(folder: folder, name: name) { return FileRecord(from: rec) }
         return try save(folder: folder, name: name, text: defaultText())
     }
 
     // MARK: - Queries
 
     private func fetchByName(folder: String, name: String) throws -> Record? {
-        var d = FetchDescriptor<Record>(predicate: #Predicate { $0.folder == folder && $0.filename == name })
-        d.fetchLimit = 1
-        return try context.fetch(d).first
+        // Compatible with optional filename schemas: filter in memory
+        var d = FetchDescriptor<Record>(predicate: #Predicate { $0.folder == folder })
+        d.fetchLimit = 200
+        let rows = try context.fetch(d)
+        return rows.first { $0.filename == name }
     }
 
     // MARK: - Naming
 
-    // title > image/asset (humanized) > text/caption > first non-empty line > timestamp
     private func baseName(from text: String) -> String {
         let kv = KeyValueLines.parse(text)
         for key in ["title", "image", "asset", "text", "caption"] {
@@ -117,10 +112,11 @@ public final class PlainStore {
     }
 
     private func sanitizeTitle(_ s: String) -> String {
-        let t = s.replacingOccurrences(of: "\n", with: " ")
-                 .replacingOccurrences(of: "\t", with: " ")
-                 .replacingOccurrences(of: "/", with: " ")
-                 .replacingOccurrences(of: ":", with: " ")
+        let t = s
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+            .replacingOccurrences(of: "/", with: " ")
+            .replacingOccurrences(of: ":", with: " ")
         let collapsed = t.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
         return String(collapsed.prefix(40)).trimmingCharacters(in: .whitespaces)
     }
@@ -144,4 +140,3 @@ public final class PlainStore {
         return f.string(from: Date.now)
     }
 }
-
