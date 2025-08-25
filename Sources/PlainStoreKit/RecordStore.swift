@@ -62,11 +62,3 @@ public final class RecordStore {
         return try context.fetch(d).first
     }
 }
-
-private extension Data {
-    var prettyPrintedString: String {
-        (try? JSONSerialization.jsonObject(with: self))
-            .flatMap { try? JSONSerialization.data(withJSONObject: $0, options: [.prettyPrinted, .sortedKeys]) }
-            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
-    }
-}
