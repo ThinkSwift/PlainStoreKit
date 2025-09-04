@@ -1,4 +1,3 @@
-// swift-tools-version: 5.9
 import PackageDescription
 
 let package = Package(
@@ -8,7 +7,6 @@ let package = Package(
         .macOS(.v14),
         .tvOS(.v17),
         .watchOS(.v10)
-        // Catalyst도 쓴다면: .macCatalyst(.v17) // Xcode 15.4+ 문법
     ],
     products: [
         .library(name: "PlainStoreKit", targets: ["PlainStoreKit"]),
